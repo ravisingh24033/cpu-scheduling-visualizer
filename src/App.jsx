@@ -8,6 +8,7 @@ export default function App() {
   ]);
   const [algorithm, setAlgorithm] =
     useState("FCFS");
+  const [timeQuantum, setTimeQuantum] = useState(2);
 
   function addProcess() {
     const newProcess = {
@@ -138,6 +139,89 @@ export default function App() {
     };
   }
 
+  function runRoundRobin(processes, timeQuantum) {
+    const remainingProcesses = processes.map((p) => ({
+      ...p,
+      remainingTime: p.burst,
+    }));
+
+    const result = [];
+    const ganttChart = [];
+    const queue = [];
+
+    let currentTime = 0;
+    let completed = 0;
+
+    while (completed < remainingProcesses.length) {
+      remainingProcesses.forEach((p) => {
+        if (
+          p.arrival <= currentTime &&
+          p.remainingTime > 0 &&
+          !queue.includes(p)
+        ) {
+          queue.push(p);
+        }
+      });
+
+      if (queue.length === 0) {
+        currentTime++;
+        continue;
+      }
+
+      const process = queue.shift();
+
+      const executionTime = Math.min(
+        timeQuantum,
+        process.remainingTime
+      );
+
+      const startTime = currentTime;
+      const endTime = currentTime + executionTime;
+
+      ganttChart.push({
+        pid: process.pid,
+        start: startTime,
+        end: endTime,
+      });
+
+      process.remainingTime -= executionTime;
+      currentTime = endTime;
+
+      remainingProcesses.forEach((p) => {
+        if (
+          p.arrival <= currentTime &&
+          p.remainingTime > 0 &&
+          !queue.includes(p) &&
+          p.pid !== process.pid
+        ) {
+          queue.push(p);
+        }
+      });
+
+      if (process.remainingTime > 0) {
+        queue.push(process);
+      } else {
+        completed++;
+
+        const completionTime = currentTime;
+        const turnaroundTime = completionTime - process.arrival;
+        const waitingTime = turnaroundTime - process.burst;
+
+        result.push({
+          ...process,
+          completionTime,
+          turnaroundTime,
+          waitingTime,
+          startTime: ganttChart.find((g) => g.pid === process.pid).start,
+        });
+      }
+    }
+
+    return {
+      calculatedResults: result,
+      ganttChart,
+    };
+  }
 
   const {
     calculatedResults,
@@ -151,8 +235,12 @@ export default function App() {
       return runSJF(processes);
     }
 
+    if (algorithm === "RR") {
+      return runRoundRobin(processes, timeQuantum);
+    }
+
     return runFCFS(processes);
-  }, [processes, algorithm]);
+  }, [processes, algorithm, timeQuantum]);
 
   return (
     <div
@@ -189,8 +277,30 @@ export default function App() {
           <option value="SJF">
             SJF
           </option>
+
+          <option value="RR">
+            Round Robin
+          </option>
+
         </select>
       </div>
+
+      {algorithm === "RR" && (
+        <div style={{ marginBottom: "20px" }}>
+          <label>Time Quantum: </label>
+
+          <input
+            type="number"
+            min="1"
+            value={timeQuantum}
+            onChange={(e) =>
+              setTimeQuantum(
+                Number(e.target.value)
+              )
+            }
+          />
+        </div>
+      )}
 
       <h2>Processes</h2>
 
@@ -254,7 +364,7 @@ export default function App() {
       <h2 style={{ marginTop: "30px" }}>
         {algorithm} Results
       </h2>
-      
+
       <h2 style={{ marginTop: "30px" }}>
         Gantt Chart
       </h2>
