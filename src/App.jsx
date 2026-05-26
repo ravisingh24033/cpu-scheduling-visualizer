@@ -1,3 +1,4 @@
+import "./App.css";
 import { useMemo, useState } from "react";
 
 export default function App() {
